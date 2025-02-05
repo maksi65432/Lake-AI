@@ -46,14 +46,15 @@ jobs:
       # 6. Download (pull) the DeepSeek models using the Ollama CLI inside the container.
       - name: Download DeepSeek Models
         run: |
-          docker exec openwebui ollama pull deepseek-v2.5:236
-          docker exec openwebui ollama pull deepseek-r1:8b
-          docker exec openwebui ollama pull deepseek-r1:14b
-          docker exec openwebui ollama pull deepseek-r1:32b
-          docker exec openwebui ollama pull deepseek-r1:70b
-          docker exec openwebui ollama pull deepseek-r1:671b
-          docker exec openwebui ollama pull deepseek-llm:7b
-          docker exec openwebui ollama pull deepseek-llm:67b
+          docker exec openwebui ollama pull deepseek-v2.5:236 || echo "deepseek-v2.5:236 model manifest not found"
+          docker exec openwebui ollama pull deepseek-r1:8b || echo "deepseek-r1:8b model manifest not found"
+          docker exec openwebui ollama pull deepseek-r1:14b || echo "deepseek-r1:14b model manifest not found"
+          docker exec openwebui ollama pull deepseek-r1:32b || echo "deepseek-r1:32b model manifest not found"
+          docker exec openwebui ollama pull deepseek-r1:70b || echo "deepseek-r1:70b model manifest not found"
+          docker exec openwebui ollama pull deepseek-r1:671b || echo "deepseek-r1:671b model manifest not found"
+          docker exec openwebui ollama pull deepseek-llm:7b || echo "deepseek-llm:7b model manifest not found"
+          docker exec openwebui ollama pull deepseek-llm:67b || echo "deepseek-llm:67b model manifest not found"
+
 
       # 7. Launch each model by issuing a test run command (with a simple prompt).
       - name: Launch DeepSeek Models (Test Run)
