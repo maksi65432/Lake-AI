@@ -13,19 +13,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Set up Docker Buildx (optional but recommended for caching and advanced builds).
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      # 3. Pull the official Open WebUI (Ollama) image and retag it.
+      # 2. Pull the official Open WebUI (Ollama) image and retag it locally.
       - name: Pull Open WebUI (Ollama) image
         run: |
           docker pull ghcr.io/open-webui/open-webui:ollama
           docker tag ghcr.io/open-webui/open-webui:ollama my-openwebui:latest
 
-      # 4. Run the Open WebUI container using host networking.
-      #    This makes sure that the internal Ollama API (default 127.0.0.1:11434) is reachable.
-      - name: Run Open WebUI container with host networking
+      # 3. Run the Open WebUI container with host networking and necessary environment variables.
+      - name: Run Open WebUI container
         run: |
           docker run -d --network=host \
             -e OLLAMA_BASE_URL="http://127.0.0.1:11434" \
@@ -34,7 +29,21 @@ jobs:
             --restart always \
             my-openwebui:latest
 
-      # 5. Wait for the Ollama API to become responsive.
+      # 4. Wait for the container to initialize.
+      - name: Wait for container startup
+        run: |
+          echo "Waiting 20 seconds for container startup..."
+          sleep 20
+
+      # 5. Ensure the Ollama service is running inside the container.
+      - name: Ensure Ollama service is running
+        run: |
+          echo "Checking if Ollama service is running..."
+          docker exec openwebui sh -c 'if ! pgrep -f "ollama serve" > /dev/null; then echo "Starting Ollama service..."; ollama serve & else echo "Ollama service already running"; fi'
+          # Allow time for the service to start
+          sleep 10
+
+      # 6. Wait until the Ollama API is responsive.
       - name: Wait for Ollama API to be ready
         run: |
           echo "Waiting for Ollama API to be ready..."
@@ -43,13 +52,13 @@ jobs:
               echo "Ollama API is ready."
               exit 0
             fi
-            echo "Not ready yet, sleeping 5 seconds..."
+            echo "Ollama API not ready yet; sleeping 5 seconds..."
             sleep 5
           done
           echo "Ollama API did not become ready in time."
           exit 1
 
-      # 6. Download the DeepSeek models.
+      # 7. Download the DeepSeek models via Ollama.
       - name: Download DeepSeek Models
         run: |
           MODELS=(
@@ -67,7 +76,7 @@ jobs:
             docker exec openwebui ollama pull "$model" || echo "$model model manifest not found or API error"
           done
 
-      # 7. Launch each DeepSeek model with a test prompt.
+      # 8. Launch each DeepSeek model with a test prompt.
       - name: Launch DeepSeek Models (Test Run)
         run: |
           MODELS=(
@@ -85,7 +94,7 @@ jobs:
             docker exec openwebui ollama run "$model" "Hello from $model" || echo "Failed to launch $model"
           done
 
-      # 8. Check that Open WebUI is responding on the expected port.
+      # 9. Check that Open WebUI is responding.
       - name: Check Open WebUI response
         run: |
           sleep 10
