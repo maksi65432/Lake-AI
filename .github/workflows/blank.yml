@@ -29,7 +29,7 @@ jobs:
       - name: Download and Start Models
         run: |
           models=(
-            "gemma2:27b"
+            "phi4"
           )
 
           for model in "${models[@]}"; do
