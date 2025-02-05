@@ -19,8 +19,8 @@ jobs:
           docker pull ghcr.io/open-webui/open-webui:ollama
           docker tag ghcr.io/open-webui/open-webui:ollama my-openwebui:latest
 
-      # 3. Run the Open WebUI container with host networking and necessary environment variables.
-      - name: Run Open WebUI container
+      # 3. Run the Open WebUI container using host networking.
+      - name: Run Open WebUI container with host networking
         run: |
           docker run -d --network=host \
             -e OLLAMA_BASE_URL="http://127.0.0.1:11434" \
@@ -29,7 +29,7 @@ jobs:
             --restart always \
             my-openwebui:latest
 
-      # 4. Wait for the container to initialize.
+      # 4. Wait for the container to start.
       - name: Wait for container startup
         run: |
           echo "Waiting 20 seconds for container startup..."
@@ -39,9 +39,14 @@ jobs:
       - name: Ensure Ollama service is running
         run: |
           echo "Checking if Ollama service is running..."
-          docker exec openwebui sh -c 'if ! pgrep -f "ollama serve" > /dev/null; then echo "Starting Ollama service..."; ollama serve & else echo "Ollama service already running"; fi'
-          # Allow time for the service to start
-          sleep 10
+          if docker exec openwebui pgrep -f "ollama serve" > /dev/null; then
+            echo "Ollama service is already running."
+          else
+            echo "Starting Ollama service..."
+            docker exec -d openwebui ollama serve
+            # Give the service time to start
+            sleep 10
+          fi
 
       # 6. Wait until the Ollama API is responsive.
       - name: Wait for Ollama API to be ready
