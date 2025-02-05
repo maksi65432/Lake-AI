@@ -2,81 +2,96 @@ name: Deploy Open WebUI with DeepSeek Models
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
+      # 1. Checkout the repository code.
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. (Optional) Set up Docker Buildx for caching and advanced builds.
+      # 2. Set up Docker Buildx (optional but recommended for caching and advanced builds).
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3. Build or pull the Docker image.
-      # Here, you can either build your custom image using your Dockerfile
-      # or pull the official Open WebUI image tagged with "ollama".
+      # 3. Pull the official Open WebUI (Ollama) image and retag it.
       - name: Pull Open WebUI (Ollama) image
         run: |
           docker pull ghcr.io/open-webui/open-webui:ollama
           docker tag ghcr.io/open-webui/open-webui:ollama my-openwebui:latest
 
-      # 4. Run the container with necessary environment variables.
-      # Here we map port 3000 on the host to port 8080 in the container.
-      # Also, we pass OLLAMA_BASE_URL (for the Ollama API) and OLLAMA_MODELS (where models are stored).
-      - name: Run Open WebUI container
+      # 4. Run the Open WebUI container using host networking.
+      #    This makes sure that the internal Ollama API (default 127.0.0.1:11434) is reachable.
+      - name: Run Open WebUI container with host networking
         run: |
-          docker run -d \
-            -p 3000:8080 \
+          docker run -d --network=host \
             -e OLLAMA_BASE_URL="http://127.0.0.1:11434" \
             -e OLLAMA_MODELS="/models" \
             --name openwebui \
             --restart always \
             my-openwebui:latest
 
-      # 5. Wait a few seconds for the container to fully start.
-      - name: Wait for container to start
-        run: sleep 20
+      # 5. Wait for the Ollama API to become responsive.
+      - name: Wait for Ollama API to be ready
+        run: |
+          echo "Waiting for Ollama API to be ready..."
+          for i in {1..12}; do
+            if docker exec openwebui curl -s http://127.0.0.1:11434/health | grep -qi "ok"; then
+              echo "Ollama API is ready."
+              exit 0
+            fi
+            echo "Not ready yet, sleeping 5 seconds..."
+            sleep 5
+          done
+          echo "Ollama API did not become ready in time."
+          exit 1
 
-      # 6. Download (pull) the DeepSeek models using the Ollama CLI inside the container.
+      # 6. Download the DeepSeek models.
       - name: Download DeepSeek Models
         run: |
-          docker exec openwebui ollama pull deepseek-v2.5:236 || echo "deepseek-v2.5:236 model manifest not found"
-          docker exec openwebui ollama pull deepseek-r1:8b || echo "deepseek-r1:8b model manifest not found"
-          docker exec openwebui ollama pull deepseek-r1:14b || echo "deepseek-r1:14b model manifest not found"
-          docker exec openwebui ollama pull deepseek-r1:32b || echo "deepseek-r1:32b model manifest not found"
-          docker exec openwebui ollama pull deepseek-r1:70b || echo "deepseek-r1:70b model manifest not found"
-          docker exec openwebui ollama pull deepseek-r1:671b || echo "deepseek-r1:671b model manifest not found"
-          docker exec openwebui ollama pull deepseek-llm:7b || echo "deepseek-llm:7b model manifest not found"
-          docker exec openwebui ollama pull deepseek-llm:67b || echo "deepseek-llm:67b model manifest not found"
+          MODELS=(
+            "deepseek-v2.5:236"
+            "deepseek-r1:8b"
+            "deepseek-r1:14b"
+            "deepseek-r1:32b"
+            "deepseek-r1:70b"
+            "deepseek-r1:671b"
+            "deepseek-llm:7b"
+            "deepseek-llm:67b"
+          )
+          for model in "${MODELS[@]}"; do
+            echo "Pulling model: $model"
+            docker exec openwebui ollama pull "$model" || echo "$model model manifest not found or API error"
+          done
 
-
-      # 7. Launch each model by issuing a test run command (with a simple prompt).
+      # 7. Launch each DeepSeek model with a test prompt.
       - name: Launch DeepSeek Models (Test Run)
         run: |
-          echo "Launching deepseek-v2.5:236..."
-          docker exec openwebui ollama run deepseek-v2.5:236 "Hello from deepseek-v2.5:236"
-          echo "Launching deepseek-r1:8b..."
-          docker exec openwebui ollama run deepseek-r1:8b "Hello from deepseek-r1:8b"
-          echo "Launching deepseek-r1:14b..."
-          docker exec openwebui ollama run deepseek-r1:14b "Hello from deepseek-r1:14b"
-          echo "Launching deepseek-r1:32b..."
-          docker exec openwebui ollama run deepseek-r1:32b "Hello from deepseek-r1:32b"
-          echo "Launching deepseek-r1:70b..."
-          docker exec openwebui ollama run deepseek-r1:70b "Hello from deepseek-r1:70b"
-          echo "Launching deepseek-r1:671b..."
-          docker exec openwebui ollama run deepseek-r1:671b "Hello from deepseek-r1:671b"
-          echo "Launching deepseek-llm:7b..."
-          docker exec openwebui ollama run deepseek-llm:7b "Hello from deepseek-llm:7b"
-          echo "Launching deepseek-llm:67b..."
-          docker exec openwebui ollama run deepseek-llm:67b "Hello from deepseek-llm:67b"
+          MODELS=(
+            "deepseek-v2.5:236"
+            "deepseek-r1:8b"
+            "deepseek-r1:14b"
+            "deepseek-r1:32b"
+            "deepseek-r1:70b"
+            "deepseek-r1:671b"
+            "deepseek-llm:7b"
+            "deepseek-llm:67b"
+          )
+          for model in "${MODELS[@]}"; do
+            echo "Launching model: $model"
+            docker exec openwebui ollama run "$model" "Hello from $model" || echo "Failed to launch $model"
+          done
 
-      # 8. (Optional) Perform a simple health check by verifying that the auth page returns expected text.
+      # 8. Check that Open WebUI is responding on the expected port.
       - name: Check Open WebUI response
         run: |
-          curl -s http://localhost:3000/auth | grep -q "Sign Up" && echo "Open WebUI is running" || (echo "Error: Open WebUI did not respond as expected" && exit 1)
+          sleep 10
+          if curl -s http://localhost:8080/auth | grep -q "Sign Up"; then
+            echo "Open WebUI is running."
+          else
+            echo "Error: Open WebUI did not respond as expected."
+            exit 1
+          fi
