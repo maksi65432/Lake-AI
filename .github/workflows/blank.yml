@@ -13,11 +13,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Pull the official Open WebUI (Ollama) image and retag it locally.
-      - name: Pull Open WebUI (Ollama) image
+      # 2. Build the custom Open WebUI (Ollama) image with procps installed.
+      - name: Build custom Open WebUI (Ollama) image
         run: |
-          docker pull ghcr.io/open-webui/open-webui:ollama
-          docker tag ghcr.io/open-webui/open-webui:ollama my-openwebui:latest
+          cat <<EOF > Dockerfile
+          FROM ghcr.io/open-webui/open-webui:ollama
+          RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
+          EOF
+          docker build -t my-openwebui:latest .
 
       # 3. Run the Open WebUI container using host networking.
       - name: Run Open WebUI container with host networking
