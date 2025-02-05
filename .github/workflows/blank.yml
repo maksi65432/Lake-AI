@@ -51,21 +51,6 @@ jobs:
             sleep 10
           fi
 
-      # 6. Wait until the Ollama API is responsive.
-      - name: Wait for Ollama API to be ready
-        run: |
-          echo "Waiting for Ollama API to be ready..."
-          for i in {1..12}; do
-            if docker exec openwebui curl -s http://127.0.0.1:11434/health | grep -qi "ok"; then
-              echo "Ollama API is ready."
-              exit 0
-            fi
-            echo "Ollama API not ready yet; sleeping 5 seconds..."
-            sleep 5
-          done
-          echo "Ollama API did not become ready in time."
-          exit 1
-
       # 7. Download the DeepSeek models via Ollama.
       - name: Download DeepSeek Models
         run: |
