@@ -29,7 +29,7 @@ jobs:
       - name: Download and Start Models
         run: |
           models=(
-            "qwen2.5:32b"
+            "gemma2:27b"
           )
 
           for model in "${models[@]}"; do
